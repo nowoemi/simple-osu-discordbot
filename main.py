@@ -1,38 +1,42 @@
 import discord
-from discord.ext import commands
 import requests
 import mysql.connector
-from mysql.connector import Error
 import pymysql
-from pymysql import cursors
 import aiohttp
 import datetime
+import os
+
+from discord.ext import commands
+from mysql.connector import Error
+from pymysql import cursors
+from dotenv import load_dotenv
+
+load_dotenv()
+
+domain = os.environ["SERVERDOMAIN"]
+servername = os.environ["SERVERNAME"]
+bot_token = os.environ["BOT_TOKEN"]
+member_role = os.environ["MEMBER_ROLE"]
+dbuser = os.environ["DBUSERNAME"]
+dbpassword = os.environ["DBPASSWORD"]
 
 # THIS PROJECT IS STILL A WORK IN PROGRESS AND SHOULD NOT BE USED FOR A BIG DEMAND. I'M WARNING YOU WITH THIS, AS YOU COULD GET LIMITED BY THE OSU! API.
 # THE IMPORTS ARE USED ALL OVER THE PYTHON CODE AND IF I GET RID OF mysql.connector OR pymysql EVERYTHING BREAKS FOR ME.
 
-# here goes your domain where your bancho server is hosted (example: miausu.pw)
-domain = "example.com"
-servername = "Example"
-
-# here goes your bot's discord token
-bot_token = "YOUR_BOT_TOKEN"
-
-# here goes your member role name on discord
-member_role = "YOUR_MEMBER_ROLE"
-
 def calculate_mods(mods: list):
+    """Calculates the mods integers together."""
     return sum(MOD_VALUES.get(mod, 0) for mod in mods)
 
-# This uses your Database Credentials to connect to it using pymysql.
+
 def connect_to_db():
+    """Connects to your Database using the Credentials you provided in the .env file."""
     try:
         connection = pymysql.connect(
             host="localhost", # This is most likely always localhost, as it's hosted on the VPS you own.
             database="banchopy", # This is the default Database Name provided from your bancho.py instance.
-            user="dbuser",
-            password="dbpassword",
-            port=3306, # This is the default Database Port provided from your bancho.py instance
+            user=dbuser,
+            password=dbpassword,
+            port=3306, # This is the default Database Port provided from your bancho.py instance, change if it's different
             cursorclass=pymysql.cursors.DictCursor # i honestly forgot what this is for, but without it the bot doesn't function anymore on my side
         )
         return connection
@@ -46,7 +50,7 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="?", intents=intents, help_command=None) # Change the Prefix if you want to :)
 
-forbidden_words = [""] # you can add your own words to this, to prevent users from saying the N-Word for example.
+forbidden_words = ["test", "test2"] # you can add your own words to this, to prevent users from saying the N-Word for example.
 
 # These Values are for decoding the Mods, as defined below.
 MOD_VALUES = {
@@ -55,7 +59,7 @@ MOD_VALUES = {
     "HD": 8,
     "HR": 16,
     "SD": 32,
-    "DT": 64,
+    "DT": 64, 
     "RX": 128,
     "HT": 256,
     "NC": 576,
@@ -75,23 +79,24 @@ def decode_mods(mods_integer):
             mods_integer -= value
     return "+" + "".join(mods_list)
 
-# This gives a new Member the Member role you defined earlier.
-# THE DEFINITION OF role_name HAS NOT BEEN TESTED YET, I CANT PROMISE THAT IT WORKS
+
 @bot.event
 async def on_member_join(members):
+    """This gives a new Member the Member role you defined in the .env file."""
+    """The print statements are just for debugging."""
     role_name = member_role
     role = discord.utils.get(members.guild.roles, name=role_name)
-
-    # This is just for debugging purposes
+    
     if role:
         await members.add_roles(role)
         print(f"Assigned {role_name} role to {members.name}")
     else:
         print(f"The Role {role_name} doesn't exist on the Server.")
 
-# Recent Command
+
 @bot.command()
 async def r(ctx, *args):
+    """Gets the most recent Score of the User."""
     base_url = f"https://api.{domain}/v1/get_player_scores?scope=recent"
     query = ""
 
@@ -276,9 +281,9 @@ async def r(ctx, *args):
         await ctx.message.delete()
 
 
-# This command is still very WIP and should not be used for daily usage, as it's still lacking on the right formatting and setup.
 @bot.command()
 async def sim(ctx, map_link: str, n300: int, n100: int, n50: int, miss: int, *args):
+    """This command is still very WIP and should not be used for daily usage, as it's still lacking on the right formatting and setup."""
     try:
         map_id = map_link.split("/")[-1]
     except:
@@ -364,9 +369,10 @@ async def sim(ctx, map_link: str, n300: int, n100: int, n50: int, miss: int, *ar
             else:
                 await ctx.send(f"Failed to simulate score. Error: {osu_direct_response.status}")
 
-# Top Command
+
 @bot.command() 
 async def top(ctx, *args):
+    """Gets the Users best play."""
     base_url = f"https://api.{domain}/v1/get_player_scores?scope=best"
     query = ""
 
@@ -543,9 +549,10 @@ async def top(ctx, *args):
         await ctx.send(f"I'm sowwy UwU, but the Coding Kitties couldn't find the specified user :c Maybe this error code can help you nya? Error {response.status_code}")
         await ctx.message.delete()
 
-# Profile Command
+
 @bot.command()
 async def profile(ctx, *args):
+    """Gets the Users profile and shows some small stats."""
     base_url = f"https://api.{domain}/v1/get_player_info?scope=stats"
     query = ""
 
@@ -629,7 +636,7 @@ async def profile(ctx, *args):
             user_id = stats.get("id")
             avatar_url = f"https://a.{domain}/{user_id}"
 
-            # You can cahnge the Description to whatever you want, i don't really care
+            # You can change the Description to whatever you want, i don't really care
             embed = discord.Embed(
                 title=f"{username}'s Stats",
                 description=f"should we ban {username}?",
@@ -653,9 +660,10 @@ async def profile(ctx, *args):
         await ctx.send(f"I'm sorry, but the Coding Kitties couldn't find the specified user. Error: {response.status_code}")
         await ctx.message.delete()
 
-# PP Record command for the 3 most played modes on osu! private servers.
+
 @bot.command()
 async def pprecord(ctx, mode: str = None):
+    """This gets the highest PP score for the three most played modes on osu! private servers."""
     connection = connect_to_db()
     if connection:
         cursor = connection.cursor()
@@ -688,6 +696,7 @@ async def pprecord(ctx, mode: str = None):
 # Linking Command, lets a User link their Discord account to their Profile.
 @bot.command()
 async def link(ctx, name: str):
+    """Lets the User link their Discord account to their private server Profile."""
     discord_id = ctx.author.id
     osu_username = name
 
@@ -735,7 +744,8 @@ async def link(ctx, name: str):
 # Say Command, makes the Bot say stuff.
 @bot.command()
 async def say(ctx, *, arg):
-  # forbidden_words are the words that you should set up earlier
+    """This makes the bot basically say stuff you give it."""
+    """You should probably set forbidden_words up before."""
     if arg in forbidden_words:
       # This message is probably a bit harsh, eh
         await ctx.send("Shut the fuck up")
@@ -746,9 +756,10 @@ async def say(ctx, *, arg):
         await ctx.message.delete()
         return
 
-# Status Command, just makes a quick GET Request to the Bancho Endpoint, which is mostly found at the url defined.
+
 @bot.command()
 async def status(ctx):
+    """This just makes a quick GET Request to your private servers Endpoint, which is found at c.example.com"""
     url = f"https://c.{domain}"
 
     response = requests.get(url)
