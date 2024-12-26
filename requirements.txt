@@ -1,0 +1,6 @@
+discord.py
+requests
+mysql.connector
+pymysql
+aiohttp
+datetime
