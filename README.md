@@ -2,6 +2,13 @@
 
 This little Project is just a small Discordbot for my own [osu! private server](https://miausu.pw) using discord.py and our API/DB access from osuAkatsuki's bancho.py installation.
 
+## Usage:
+1. Clone this repo.
+2. Ensure you have Python 3.9 installed (it might work on higher versions, but im using 3.9)
+3. Run `pip install -r requirements.txt && rm requirements.txt`
+4. Set up the Values at the top of the Bot's code accordingly.
+5. Run the Bot using `python3.9 main.py`
+
 ## Current commands:
 ##### "(" ")" these show you how the commands work.
 - ?r (username)  - Shows the recent score.
