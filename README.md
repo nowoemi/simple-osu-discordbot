@@ -6,7 +6,7 @@ This little Project is just a small Discordbot for my own [osu! private server](
 1. Clone this repo.
 2. Ensure you have Python 3.9 installed (it might work on higher versions, but im using 3.9)
 3. Run `pip install -r requirements.txt && rm requirements.txt`
-4. Set up the Values at the top of the Bot's code accordingly.
+4. Set up your Bot and Database Credentials in the .env file.
 5. Run the Bot using `python3.9 main.py`
 
 ## Current commands:
