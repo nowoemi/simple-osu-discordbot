@@ -93,6 +93,28 @@ async def on_member_join(members):
     else:
         print(f"The Role {role_name} doesn't exist on the Server.")
 
+@bot.command()
+async def help(ctx):
+    embed = discord.Embed(
+        title="How do these work?",
+        description="Glad that you asked!",
+        color=discord.Color.blue(),
+        timestamp=datetime.datetime.now()
+    )
+
+    embed.add_field(name="?help", value="Shows this Embed.", inline=False)
+    embed.add_field(name="?r [-rx/-ap]", value="Shows your recent score.", inline=False)
+    embed.add_field(name="?sim (maplink) (300s) (100s) (50s) (misses)", value="Simulates a Score based on your input.", inline=False)
+    embed.add_field(name="?top [-rx/-ap]", value="Shows your top score.", inline=False)
+    embed.add_field(name="?profile [-rx/-ap]", value="Shows your profile stats.", inline=False)
+    embed.add_field(name="?pprecord [-rx/-ap]", value="Shows the pp record for the respective mode.", inline=False)
+    embed.add_field(name="?link (username)",  value=f"Links your Discord Account to your {servername} Account.", inline=False)
+    embed.add_field(name="?say (message)", value="Let the bot say stupid shit.", inline=False)
+
+    embed.set_footer(text="\"[]\" indicate that this is optional, \"()\" indicate that this is required.", icon_url="https://i.ibb.co/pKPKTJs/onlfull.png")
+
+    await ctx.send(embed=embed)
+    await ctx.message.delete()
 
 @bot.command()
 async def r(ctx, *args):
