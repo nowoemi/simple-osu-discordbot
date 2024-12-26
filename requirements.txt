@@ -4,3 +4,4 @@ mysql.connector
 pymysql
 aiohttp
 datetime
+python-dotenv
