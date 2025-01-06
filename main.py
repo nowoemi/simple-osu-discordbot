@@ -111,7 +111,7 @@ async def help(ctx):
     embed.add_field(name="?pprecord [-rx/-ap]", value="Shows the pp record for the respective mode.", inline=False)
     embed.add_field(name="?link (username)",  value=f"Links your Discord Account to your {servername} Account.", inline=False)
     embed.add_field(name="?say (message)", value="Let the bot say stupid shit.", inline=False)
-    embed.add_field(name="?unlink", valuef"Unlinks your Discord account from your {servername} Account.", inline=False)
+    embed.add_field(name="?unlink", value=f"Unlinks your Discord account from your {servername} Account.", inline=False)
 
     embed.set_footer(text="\"[]\" indicate that this is optional, \"()\" indicate that this is required.", icon_url="https://i.ibb.co/pKPKTJs/onlfull.png")
 
