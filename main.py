@@ -19,6 +19,7 @@ bot_token = os.environ["BOT_TOKEN"]
 member_role = os.environ["MEMBER_ROLE"]
 dbuser = os.environ["DBUSERNAME"]
 dbpassword = os.environ["DBPASSWORD"]
+apiurl = os.environ["MIRRORAPIURL"]
 
 # THIS PROJECT IS STILL A WORK IN PROGRESS AND SHOULD NOT BE USED FOR A BIG DEMAND. I'M WARNING YOU WITH THIS, AS YOU COULD GET LIMITED BY THE OSU! API.
 # THE IMPORTS ARE USED ALL OVER THE PYTHON CODE AND IF I GET RID OF mysql.connector OR pymysql EVERYTHING BREAKS FOR ME.
@@ -110,6 +111,7 @@ async def help(ctx):
     embed.add_field(name="?pprecord [-rx/-ap]", value="Shows the pp record for the respective mode.", inline=False)
     embed.add_field(name="?link (username)",  value=f"Links your Discord Account to your {servername} Account.", inline=False)
     embed.add_field(name="?say (message)", value="Let the bot say stupid shit.", inline=False)
+    embed.add_field(name="?unlink", valuef"Unlinks your Discord account from your {servername} Account.", inline=False)
 
     embed.set_footer(text="\"[]\" indicate that this is optional, \"()\" indicate that this is required.", icon_url="https://i.ibb.co/pKPKTJs/onlfull.png")
 
@@ -258,9 +260,9 @@ async def r(ctx, *args):
 
         # Here we fetch the maximum PP possible of the map (possibly also with your played mod combination)
         if mods_integer == 0:
-            osu_direct_api_url = f"https://osu.direct/api/pp/{mapid}"
+            mirror_api_url = f"https://{apiurl}/pp/{mapid}"
         else:
-            osu_direct_api_url = f"https://osu.direct/api/pp/{mapid}?mods={mods_integer}"
+            mirror_api_url = f"https://{apiurl}/pp/{mapid}?mods={mods_integer}"
 
         mods_display = decode_mods(mods_integer)
 
@@ -272,11 +274,11 @@ async def r(ctx, *args):
 
         # grabbing the pp values from the osu.direct api
         async with aiohttp.ClientSession() as session:
-            async with session.get(osu_direct_api_url) as osu_direct_response:
-                if osu_direct_response.status == 200:
-                    osu_direct_data = await osu_direct_response.json()
-                    fc_rawpp = osu_direct_data["pp"]["100"]["pp"]
-                    modded_rawsr = osu_direct_data["difficulty"]["stars"]
+            async with session.get(mirror_api_url) as mirror_api_response:
+                if mirror_api_response.status == 200:
+                    mirror_data = await mirror_api_response.json()
+                    fc_rawpp = mirror_data["pp"]["100"]["pp"]
+                    modded_rawsr = mirror_data["difficulty"]["stars"]
                 else:
                     fc_rawpp = "N/A"
 
@@ -333,13 +335,13 @@ async def sim(ctx, map_link: str, n300: int, n100: int, n50: int, miss: int, *ar
         mode_name = "Vanilla"
 
     async with aiohttp.ClientSession() as session:
-        osu_direct_api_url = f"https://osu.direct/api/pp/{map_id}"
-        async with session.get(osu_direct_api_url) as osu_direct_response:
-            if osu_direct_response.status == 200:
-                osu_direct_data = await osu_direct_response.json()
-                max_combo = osu_direct_data["map"]["maxCombo"]
+        mirror_api_url = f"https://{apiurl}/pp/{map_id}"
+        async with session.get(mirror_api_url) as mirror_api_response:
+            if mirror_api_response.status == 200:
+                mirror_data = await mirror_api_response.json()
+                max_combo = mirror_data["map"]["maxCombo"]
             else:
-                await ctx.send(f"Failed to fetch beatmap data. Error: {osu_direct_response.status}")
+                await ctx.send(f"Failed to fetch beatmap data. Error: {mirror_api_response.status}")
                 return
 
     combo = max_combo - n100 - n50 - miss
@@ -356,14 +358,14 @@ async def sim(ctx, map_link: str, n300: int, n100: int, n50: int, miss: int, *ar
     accuracy = round(accuracy, 2)
 
     async with aiohttp.ClientSession() as session:
-        osu_direct_api_url = f"https://osu.direct/api/pp/{map_id}"
-        async with session.get(osu_direct_api_url) as osu_direct_response:
-            if osu_direct_response.status == 200:
-                osu_direct_data = await osu_direct_response.json()
-                pp_100 = osu_direct_data["pp"]["100"]["pp"]
-                pp_99 = osu_direct_data["pp"]["99"]["pp"]
-                pp_98 = osu_direct_data["pp"]["98"]["pp"]
-                pp_95 = osu_direct_data["pp"]["95"]["pp"]
+        mirror_api_url = f"https://{apiurl}/pp/{map_id}"
+        async with session.get(mirror_api_url) as mirror_api_response:
+            if mirror_api_response.status == 200:
+                mirror_api_data = await osu_direct_response.json()
+                pp_100 = mirror_api_data["pp"]["100"]["pp"]
+                pp_99 = mirror_api_data["pp"]["99"]["pp"]
+                pp_98 = mirror_api_data["pp"]["98"]["pp"]
+                pp_95 = mirror_api_data["pp"]["95"]["pp"]
 
                 if accuracy == 100:
                     rawpp = pp_100
@@ -529,9 +531,9 @@ async def top(ctx, *args):
         mods_integer = best_play.get("mods", 0)
 
         if mods_integer == 0:
-            osu_direct_api_url = f"https://osu.direct/api/pp/{mapid}"
+            mirror_api_url = f"https://{apiurl}/pp/{mapid}"
         else:
-            osu_direct_api_url = f"https://osu.direct/api/pp/{mapid}?mods={mods_integer}"
+            mirror_api_url = f"https://{apiurl}/pp/{mapid}?mods={mods_integer}"
 
         mods_display = decode_mods(mods_integer)
 
@@ -542,11 +544,11 @@ async def top(ctx, *args):
         accuracy = best_play.get("acc", 0)
 
         async with aiohttp.ClientSession() as session:
-            async with session.get(osu_direct_api_url) as osu_direct_response:
-                if osu_direct_response.status == 200:
-                    osu_direct_data = await osu_direct_response.json()
-                    fc_rawpp = osu_direct_data["pp"]["100"]["pp"]
-                    modded_rawsr = osu_direct_data["difficulty"]["stars"]
+            async with session.get(mirror_api_url) as mirror_api_response:
+                if mirror_api_response.status == 200:
+                    mirror_api_data = await mirror_api_response.json()
+                    fc_rawpp = mirror_api_data["pp"]["100"]["pp"]
+                    modded_rawsr = mirror_api_data["difficulty"]["stars"]
                 else:
                     fc_rawpp = "N/A"
 
@@ -718,7 +720,6 @@ async def pprecord(ctx, mode: str = None):
 # Linking Command, lets a User link their Discord account to their Profile.
 @bot.command()
 async def link(ctx, name: str):
-    """Lets the User link their Discord account to their private server Profile."""
     discord_id = ctx.author.id
     osu_username = name
 
@@ -730,6 +731,16 @@ async def link(ctx, name: str):
 
     cursor = connection.cursor()
 
+    cursor.execute("SELECT discord_id FROM linked_accounts WHERE osu_username = %s", (osu_username,))
+    result = cursor.fetchone()
+
+    if result:
+        await ctx.send(f"The osu! account {osu_username} is already linked to another person.")
+        await ctx.message.delete()
+        cursor.close()
+        connection.close()
+        return
+
     cursor.execute("SELECT osu_username FROM linked_accounts WHERE discord_id = %s", (discord_id,))
     result = cursor.fetchone()
 
@@ -740,8 +751,9 @@ async def link(ctx, name: str):
         cursor.close()
         connection.close()
         return
+    
+    cursor = connection.cursor()
 
-    # This creates a new Table if there's not already one present (it was the easiest way for me to implement this)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS linked_accounts (
         discord_id BIGINT PRIMARY KEY,
@@ -753,15 +765,37 @@ async def link(ctx, name: str):
     connection.commit()
 
     cursor.execute("SELECT osu_username FROM linked_accounts WHERE discord_id = %s", (discord_id,))
-    osu_name = cursor.fetchone()
+    osu_username = cursor.fetchone()
 
-    server_username = result['osu_name']
+    if osu_username:
+        server_username = osu_username['osu_username']
 
-    await ctx.send(f"Your Discord account has been successfully linked to {server_username}")
-    await ctx.message.delete()
+        await ctx.send(f"Your Discord account has been successfully linked to {server_username}")
+        await ctx.message.delete()
+        return 
 
     cursor.close()
     connection.close()
+
+# Unlink Command, lets a user unlink their Profile.
+@bot.command()
+async def unlink(ctx):
+    discord_id = ctx.author.id
+
+    connection = connect_to_db()
+    if not connection:
+        await ctx.send("Could not connect to the Database. Please try again later.")
+        await ctx.message.delete()
+        return
+
+    cursor = connection.cursor()
+    cursor.execute("DELETE FROM linked_accounts WHERE discord_id = %s", (discord_id,))
+    connection.commit()
+    cursor.close()
+    connection.close()
+    await ctx.send("Successfully unlinked your Account.")
+    await ctx.message.delete()
+    return
 
 # Say Command, makes the Bot say stuff.
 @bot.command()
