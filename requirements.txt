@@ -1,4 +1,4 @@
-discord.py
+nextcord
 requests
 mysql.connector
 pymysql
