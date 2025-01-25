@@ -1,4 +1,4 @@
-import discord
+import nextcord
 import requests
 import mysql.connector
 import pymysql
@@ -6,7 +6,8 @@ import aiohttp
 import datetime
 import os
 
-from discord.ext import commands
+from nextcord.ext import commands
+from nextcord import Embed
 from mysql.connector import Error
 from pymysql import cursors
 from dotenv import load_dotenv
@@ -20,47 +21,42 @@ member_role = os.environ["MEMBER_ROLE"]
 dbuser = os.environ["DBUSERNAME"]
 dbpassword = os.environ["DBPASSWORD"]
 apiurl = os.environ["MIRRORAPIURL"]
+guildid = os.environ["GUILD_ID"]
 
-# THIS PROJECT IS STILL A WORK IN PROGRESS AND SHOULD NOT BE USED FOR A BIG DEMAND. I'M WARNING YOU WITH THIS, AS YOU COULD GET LIMITED BY THE OSU! API.
-# THE IMPORTS ARE USED ALL OVER THE PYTHON CODE AND IF I GET RID OF mysql.connector OR pymysql EVERYTHING BREAKS FOR ME.
+intents = nextcord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(intents=intents)
+
+@bot.event
+async def on_ready():
+    await bot.sync_application_commands()
+    print("We ball")
 
 def calculate_mods(mods: list):
-    """Calculates the mods integers together."""
     return sum(MOD_VALUES.get(mod, 0) for mod in mods)
 
-
 def connect_to_db():
-    """Connects to your Database using the Credentials you provided in the .env file."""
     try:
         connection = pymysql.connect(
-            host="localhost", # This is most likely always localhost, as it's hosted on the VPS you own.
-            database="banchopy", # This is the default Database Name provided from your bancho.py instance.
+            host="localhost",
+            database="banchopy",
             user=dbuser,
             password=dbpassword,
-            port=3306, # This is the default Database Port provided from your bancho.py instance, change if it's different
-            cursorclass=pymysql.cursors.DictCursor # i honestly forgot what this is for, but without it the bot doesn't function anymore on my side
+            port=3306,
+            cursorclass=pymysql.cursors.DictCursor
         )
         return connection
     except Error as e:
         print(f"Error: {e}")
         return None
 
-intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
-
-bot = commands.Bot(command_prefix="?", intents=intents, help_command=None) # Change the Prefix if you want to :)
-
-forbidden_words = ["test", "test2"] # you can add your own words to this, to prevent users from saying the N-Word for example.
-
-# These Values are for decoding the Mods, as defined below.
 MOD_VALUES = {
     "NF": 1,
     "EZ": 2,
     "HD": 8,
     "HR": 16,
     "SD": 32,
-    "DT": 64, 
+    "DT": 64,
     "RX": 128,
     "HT": 256,
     "NC": 576,
@@ -70,7 +66,7 @@ MOD_VALUES = {
 }
 
 def decode_mods(mods_integer):
-    """Decode the mods integer into a readable mod combo."""
+    """Decode mods integer into a readable mod string."""
     if mods_integer == 0:
         return "+NM"
     mods_list = []
@@ -80,92 +76,69 @@ def decode_mods(mods_integer):
             mods_integer -= value
     return "+" + "".join(mods_list)
 
+@bot.slash_command(guild_ids=[guildid], description="Replies with Pong!")
+async def ping(interaction: nextcord.Interaction):
+    await interaction.response.send_message("Pong!", ephemeral=False)
 
-@bot.event
-async def on_member_join(members):
-    """This gives a new Member the Member role you defined in the .env file."""
-    """The print statements are just for debugging."""
-    role_name = member_role
-    role = discord.utils.get(members.guild.roles, name=role_name)
-    
-    if role:
-        await members.add_roles(role)
-        print(f"Assigned {role_name} role to {members.name}")
-    else:
-        print(f"The Role {role_name} doesn't exist on the Server.")
+@bot.slash_command(guild_ids=[guildid], description="Shows you the available Commands")
+async def help(interaction: nextcord.Interaction):
 
-@bot.command()
-async def help(ctx):
-    embed = discord.Embed(
+    embed = nextcord.Embed(
         title="How do these work?",
         description="Glad that you asked!",
-        color=discord.Color.blue(),
+        color=nextcord.Color.blue(),
         timestamp=datetime.datetime.now()
     )
 
-    embed.add_field(name="?help", value="Shows this Embed.", inline=False)
-    embed.add_field(name="?r [-rx/-ap]", value="Shows your recent score.", inline=False)
-    embed.add_field(name="?sim (maplink) (300s) (100s) (50s) (misses)", value="Simulates a Score based on your input.", inline=False)
-    embed.add_field(name="?top [-rx/-ap]", value="Shows your top score.", inline=False)
-    embed.add_field(name="?profile [-rx/-ap]", value="Shows your profile stats.", inline=False)
-    embed.add_field(name="?pprecord [-rx/-ap]", value="Shows the pp record for the respective mode.", inline=False)
-    embed.add_field(name="?link (username)",  value=f"Links your Discord Account to your {servername} Account.", inline=False)
-    embed.add_field(name="?say (message)", value="Let the bot say stupid shit.", inline=False)
-    embed.add_field(name="?unlink", value=f"Unlinks your Discord account from your {servername} Account.", inline=False)
+    embed.add_field(name="/help", value="Shows this Embed.", inline=False)
+    embed.add_field(name="/r [rx/ap] (username)", value="Shows your recent score.", inline=False)
+    embed.add_field(name="/top [rx/ap] (username)", value="Shows your top score.", inline=False)
+    embed.add_field(name="/profile [rx/ap] (username)", value="Shows your profile stats.", inline=False)
+    embed.add_field(name="/pprecord [rx/ap]", value="Shows the pp record for the respective mode.", inline=False)
+    embed.add_field(name="/link (username)",  value=f"Links your Discord Account to your {servername} Account.", inline=False)
+    embed.add_field(name="/unlink", value=f"Unlinks your Discord account from your {servername} Account.", inline=False)
 
     embed.set_footer(text="\"[]\" indicate that this is optional, \"()\" indicate that this is required.", icon_url="https://i.ibb.co/pKPKTJs/onlfull.png")
 
-    await ctx.send(embed=embed)
-    await ctx.message.delete()
+    await interaction.send(embed=embed)
 
-@bot.command()
-async def r(ctx, *args):
-    """Gets the most recent Score of the User."""
+@bot.slash_command(guild_ids=[guildid], description="Shows your most recent score.")
+async def r(interaction: nextcord.Interaction, username: str = None, mode: str = None):
+    await interaction.response.defer()
     base_url = f"https://api.{domain}/v1/get_player_scores?scope=recent"
     query = ""
 
-    # Defaulting the mode, mode_id and username to nothing, to make -rx possible.
-    mode = None
     mode_id = 0
-    username = None
 
-    if args and args[0] in ['-ap', '-rx', '-mania', '-ctb', '-taiko']:
-        mode = args[0]
-        args = args[1:]
-    
-    else: 
-        mode = None
-
-    if mode == '-ap':
+    if mode == 'ap':
         mode_name = "AutoPilot"
         mode_id = 8
-    elif mode == '-rx':
+    elif mode == 'rx':
         mode_name = "Relax"
         mode_id = 4
-    elif mode == '-mania':
+    elif mode == 'mania':
         mode_name = "Mania"
         mode_id = 3
-    elif mode == '-ctb':
+    elif mode == 'ctb':
         mode_name = "CatchTheBeat"
         mode_id = 2
-    elif mode == '-taiko':
+    elif mode == 'taiko':
         mode_name = "Taiko"
         mode_id = 1
     else:
         mode_name = "Vanilla"
         mode_id = 0
 
-    if args:
-        username = args[0]
-        query += f"&name={username}"
-
-    # This just connects to your Database if the user already has their account linked.
+    if username:
+        name = username
+        print(f"{name}")
+        query += f"&name={name}"
+    
     else:
-        discord_id = ctx.author.id
+        discord_id = interaction.user.id
         connection = connect_to_db()
         if not connection:
-            await ctx.send("Could not connect to the Database. Please try again later.")
-            await ctx.message.delete()
+            await interaction.response.send_message("Could not connect to the Database. Please try again later.")
             return
 
         cursor = connection.cursor()
@@ -177,8 +150,7 @@ async def r(ctx, *args):
             username = result['osu_username']
             query += f"&name={username}"
         else:
-            await ctx.send("You have not linked your osu! account yet. Please link your account first.")
-            await ctx.message.delete()
+            await interaction.response.send_message("You have not linked your osu! account yet. Please link your account first.")
             cursor.close()
             connection.close()
             return
@@ -194,7 +166,7 @@ async def r(ctx, *args):
         data = response.json()
 
         if not data['scores']:
-            await ctx.send(f"No recent scores found for {username} in the Mode {mode_name}")
+            await interaction.response.send_message(f"No recent scores found for {username} in the Mode {mode_name}")
             return
 
         if isinstance(data, list) and data:
@@ -202,7 +174,7 @@ async def r(ctx, *args):
         elif isinstance(data, dict) and 'scores' in data:
             latest_play = data['scores'][0]
         else:
-            await ctx.send("No recent scores found!")
+            await interaction.response.send_message("No recent scores found!")
             return
 
         player = data.get("player", {})
@@ -213,8 +185,7 @@ async def r(ctx, *args):
         
         score = latest_play.get("score", {})
         scoreid = latest_play.get("id", 0)
-
-        # You have to change the Emoji ID's (and maybe the names) to the ones on your Discord.
+        
         rawgrade = latest_play.get("grade", {})
         if rawgrade == "D":
             gradeemoji = "<:Drank:1321578154376298630>"
@@ -246,19 +217,18 @@ async def r(ctx, *args):
         mapdiff = beatmap.get("version", "N/A")
         mapsetid = beatmap.get("set_id", "N/A")
         mapid = beatmap.get("id", "N/A")
-        mapper = beatmap.get("creator", "N/A")
-        mapsr = beatmap.get("diff", "N/A")
-        mapurl = f"https://{domain}/b/{mapid}"
-      
         rawmappp = latest_play.get("pp", 0)
         mappp = round(rawmappp, 2)
+        mapper = beatmap.get("creator", "N/A")
 
-        # This just grabs the Beatmap background from Bancho.
+        mapsr = beatmap.get("diff", "N/A")
+        
+        mapurl = f"https://{domain}/b/{mapid}"
+
         mapbg = f"https://b.ppy.sh/thumb/{mapsetid}l.jpg"
 
         mods_integer = latest_play.get("mods", 0)
 
-        # Here we fetch the maximum PP possible of the map (possibly also with your played mod combination)
         if mods_integer == 0:
             mirror_api_url = f"https://{apiurl}/pp/{mapid}"
         else:
@@ -272,7 +242,6 @@ async def r(ctx, *args):
         nmiss = latest_play.get("nmiss", 0)
         accuracy = latest_play.get("acc", 0)
 
-        # grabbing the pp values from the osu.direct api
         async with aiohttp.ClientSession() as session:
             async with session.get(mirror_api_url) as mirror_api_response:
                 if mirror_api_response.status == 200:
@@ -285,11 +254,10 @@ async def r(ctx, *args):
         fc_pp = round(fc_rawpp, 2)
         modded_sr = round(modded_rawsr, 2)
 
-        # You possibly have to change the icon_url to your Server icon.
-        embed = discord.Embed(
+        embed = nextcord.Embed(
             title=f"{mapname} - {mapdiff} by {mapper}",
             url=f"https://{domain}/b/{mapid}",
-            color=discord.Color.blue(),
+            color=nextcord.Color.blue(),
             timestamp=datetime.datetime.now()
         )
 
@@ -298,148 +266,47 @@ async def r(ctx, *args):
         embed.add_field(name="", value=f"{gradeemoji}  •  {mappp}/{fc_pp}pp  •  {accuracy:.2f}%  •  {modded_sr} :star:  •   {mods_display}\n{score_formatted}  •  x{combo}/{map_combo}  •  {n300}/{n100}/{n50}/{nmiss}  •  [Replay](https://api.miausu.pw/v1/get_replay?id={scoreid})", inline=False)
         embed.set_footer(icon_url="https://i.ibb.co/pKPKTJs/onlfull.png", text=f"Mode: {mode_name} • On {servername}")
 
-        await ctx.send(embed=embed)
-        await ctx.message.delete()
+        await interaction.send(embed=embed)
     else:
-        await ctx.send(f"I'm sowwy UwU, but the Coding Kitties couldn't find the specified user :c Maybe this error code can help you nya? Error {response.status_code}")
-        await ctx.message.delete()
+        await interaction.response.send_message(f"I'm sowwy UwU, but the Coding Kitties couldn't find the specified user :c Maybe this error code can help you nya? Error {response.status_code}")
 
-
-@bot.command()
-async def sim(ctx, map_link: str, n300: int, n100: int, n50: int, miss: int, *args):
-    """This command is still very WIP and should not be used for daily usage, as it's still lacking on the right formatting and setup."""
-    try:
-        map_id = map_link.split("/")[-1]
-    except:
-        await ctx.send("Invalid map link! Please provide a valid map URL.")
-        return
-
-    mode = None
-
-    if mode and args[0] in ['-ap', '-rx', '-mania', '-ctb', '-taiko']:
-        args = args[0]
-    else: 
-        mode = args
-
-    if mode == '-rx':
-        mode_name = "Relax"
-    elif mode == '-ap':
-        mode_name = "Autopilot"
-    elif mode == '-mania':
-        mode_name = "Mania"
-    elif mode == '-ctb':
-        mode_name = "CatchTheBeat"
-    elif mode == '-taiko':
-        mode_name = "Taiko"
-    else:
-        mode_name = "Vanilla"
-
-    async with aiohttp.ClientSession() as session:
-        mirror_api_url = f"https://{apiurl}/pp/{map_id}"
-        async with session.get(mirror_api_url) as mirror_api_response:
-            if mirror_api_response.status == 200:
-                mirror_data = await mirror_api_response.json()
-                max_combo = mirror_data["map"]["maxCombo"]
-            else:
-                await ctx.send(f"Failed to fetch beatmap data. Error: {mirror_api_response.status}")
-                return
-
-    combo = max_combo - n100 - n50 - miss
-    if combo < 0:
-        await ctx.send("Invalid hit counts! The combo cannot be negative.")
-        return
-
-    total_hits = n300 + n100 + n50 + miss
-    if total_hits == 0:
-        await ctx.send("Invalid hit counts! Total hits cannot be zero.")
-        return
-
-    accuracy = ((n300 * 300 + n100 * 100 + n50 * 50) / (total_hits * 300)) * 100
-    accuracy = round(accuracy, 2)
-
-    async with aiohttp.ClientSession() as session:
-        mirror_api_url = f"https://{apiurl}/pp/{map_id}"
-        async with session.get(mirror_api_url) as mirror_api_response:
-            if mirror_api_response.status == 200:
-                mirror_api_data = await osu_direct_response.json()
-                pp_100 = mirror_api_data["pp"]["100"]["pp"]
-                pp_99 = mirror_api_data["pp"]["99"]["pp"]
-                pp_98 = mirror_api_data["pp"]["98"]["pp"]
-                pp_95 = mirror_api_data["pp"]["95"]["pp"]
-
-                if accuracy == 100:
-                    rawpp = pp_100
-                elif accuracy >= 99:
-                    rawpp = pp_99
-                elif accuracy >= 98:
-                    rawpp = pp_98
-                else:
-                    rawpp = pp_95
-
-                rounded_pp = round(rawpp, 2)
-
-                embed = discord.Embed(
-                    title="Score Simulation",
-                    description=f"Simulated score for map ID: {map_id}",
-                    color=discord.Color.blue()
-                )
-                embed.add_field(name="Mode", value=mode_name, inline=True)
-                embed.add_field(name="Combo", value=f"{combo}x", inline=True)
-                embed.add_field(name="Misses", value=miss, inline=True)
-                embed.add_field(name="Accuracy", value=f"{accuracy}%", inline=True)
-                embed.add_field(name="PP", value=f"{rounded_pp}pp", inline=True)
-
-                await ctx.send(embed=embed)
-            else:
-                await ctx.send(f"Failed to simulate score. Error: {osu_direct_response.status}")
-
-
-@bot.command() 
-async def top(ctx, *args):
-    """Gets the Users best play."""
+@bot.slash_command(guild_ids=[guildid], description="Shows your best play in the specified mode.")
+async def top(interaction: nextcord.Interaction, username: str = None, mode: str = None):
+    await interaction.response.defer()
     base_url = f"https://api.{domain}/v1/get_player_scores?scope=best"
     query = ""
 
-    mode = None
     mode_id = 0
-    username = None
 
-    if args and args[0] in ['-ap', '-rx', '-mania', '-ctb', '-taiko']:
-        mode = args[0]
-        args = args[1:]
-    
-    else: 
-        mode = None
-
-    if mode == '-ap':
+    if mode == 'ap':
         mode_name = "AutoPilot"
         mode_id = 8
-    elif mode == '-rx':
+    elif mode == 'rx':
         mode_name = "Relax"
         mode_id = 4
-    elif mode == '-mania':
+    elif mode == 'mania':
         mode_name = "Mania"
         mode_id = 3
-    elif mode == '-ctb':
+    elif mode == 'ctb':
         mode_name = "CatchTheBeat"
         mode_id = 2
-    elif mode == '-taiko':
+    elif mode == 'taiko':
         mode_name = "Taiko"
         mode_id = 1
     else:
         mode_name = "Vanilla"
         mode_id = 0
         
-    if args:
-        username = args[0]
-        query += f"&name={username}"
+    if username:
+        name = username
+        query += f"&name={name}"
     
     else:
-        discord_id = ctx.author.id
+        discord_id = interaction.user.id
         connection = connect_to_db()
         if not connection:
-            await ctx.send("Could not connect to the Database. Please try again later.")
-            await ctx.message.delete()
+            await interaction.send("Could not connect to the Database. Please try again later.")
+            await interaction.message.delete()
             return
 
         cursor = connection.cursor()
@@ -451,8 +318,7 @@ async def top(ctx, *args):
             username = result['osu_username']
             query += f"&name={username}"
         else:
-            await ctx.send("You have not linked your osu! account yet. Please link your account first.")
-            await ctx.message.delete()
+            await interaction.send("You have not linked your osu! account yet. Please link your account first.")
             cursor.close()
             connection.close()
             return
@@ -468,7 +334,7 @@ async def top(ctx, *args):
         data = response.json()
 
         if not data['scores']:
-            await ctx.send(f"No top scores found for {username} on {mode_name}")
+            await interaction.send(f"No top scores found for {username} on {mode_name}")
             return
 
         if isinstance(data, list) and data:
@@ -476,7 +342,7 @@ async def top(ctx, *args):
         elif isinstance(data, dict) and 'scores' in data:
             best_play = data['scores'][0]
         else:
-            await ctx.send("No best scores found!")
+            await interaction.send("No best scores found!")
             return
 
         player = data.get("player", {})
@@ -488,7 +354,6 @@ async def top(ctx, *args):
         score = best_play.get("score", {})
         scoreid = best_play.get("id", 0)
 
-        # Change Emoji ID's (and names) to your Discord Servers.
         rawgrade = best_play.get("grade", {})
         if rawgrade == "D":
             gradeemoji = "<:Drank:1321578154376298630>"
@@ -555,71 +420,57 @@ async def top(ctx, *args):
         fc_pp = round(fc_rawpp, 2)
         modded_sr = round(modded_rawsr, 2)
 
-        embed = discord.Embed(
+        embed = nextcord.Embed(
             title=f"{mapname} - {mapdiff} by {mapper}",
             url=f"https://{domain}/b/{mapid}",
-            color=discord.Color.blue(),
+            color=nextcord.Color.blue(),
             timestamp=datetime.datetime.now()
         )
 
-        embed.set_author(name=f"Best Score for {username}", url=f"https://{domain}/scores/{scoreid}", icon_url=f"https://a.{domain}/{user_id}")
+        embed.set_author(name=f"Best Score for {username}", url=f"https://{domain}/scores/{scoreid}", icon_url=f"https://a.miausu.pw/{user_id}")
         embed.set_thumbnail(url=mapbg)
         embed.add_field(name="", value=f"{gradeemoji}  •  {mappp}/{fc_pp}pp  •  {accuracy:.2f}%  •  {modded_sr} :star:  •  {mods_display}\n{score_formatted}  •  x{combo}/{map_combo}  •  {n300}/{n100}/{n50}/{nmiss}  •  [Replay](https://api.{domain}/v1/get_replay?id={scoreid})", inline=False)
         embed.set_footer(icon_url="https://i.ibb.co/pKPKTJs/onlfull.png", text=f"Mode: {mode_name} • On {servername}")
 
-        await ctx.send(embed=embed)
-        await ctx.message.delete()
+        await interaction.send(embed=embed)
     else:
-        await ctx.send(f"I'm sowwy UwU, but the Coding Kitties couldn't find the specified user :c Maybe this error code can help you nya? Error {response.status_code}")
-        await ctx.message.delete()
+        await interaction.send(f"I'm sowwy UwU, but the Coding Kitties couldn't find the specified user :c Maybe this error code can help you nya? Error {response.status_code}")
 
-
-@bot.command()
-async def profile(ctx, *args):
-    """Gets the Users profile and shows some small stats."""
+@bot.slash_command(guild_ids=[guildid], description="Shows your profile for the specified mode.")
+async def profile(interaction: nextcord.Interaction, username: str = None, mode: str = None):
     base_url = f"https://api.{domain}/v1/get_player_info?scope=stats"
     query = ""
 
-    mode = None
     mode_id = 0
-    username = None
 
-    if args and args[0] in ['-ap', '-rx', '-mania', '-ctb', '-taiko']:
-        mode = args[0]
-        args = args[1:]
-    
-    else: 
-        mode = None
-
-    if mode == '-ap':
+    if mode == 'ap':
         mode_name = "AutoPilot"
         mode_id = 8
-    elif mode == '-rx':
+    elif mode == 'rx':
         mode_name = "Relax"
         mode_id = 4
-    elif mode == '-mania':
+    elif mode == 'mania':
         mode_name = "Mania"
         mode_id = 3
-    elif mode == '-ctb':
+    elif mode == 'ctb':
         mode_name = "CatchTheBeat"
         mode_id = 2
-    elif mode == '-taiko':
+    elif mode == 'taiko':
         mode_name = "Taiko"
         mode_id = 1
     else:
         mode_name = "Vanilla"
         mode_id = 0
 
-    if args:
-        username = args[0]
-        query += f"&name={username}"
+    if username:
+        name = username
+        query += f"&name={name}"
     
     else:
-        discord_id = ctx.author.id
+        discord_id = interaction.user.id
         connection = connect_to_db()
         if not connection:
-            await ctx.send("Could not connect to the Database. Please try again later.")
-            await ctx.message.delete()
+            await interaction.send("Could not connect to the Database. Please try again later.")
             return
 
         cursor = connection.cursor()
@@ -631,8 +482,7 @@ async def profile(ctx, *args):
             username = result['osu_username']
             query += f"&name={username}"
         else:
-            await ctx.send("You have not linked your osu! account yet. Please link your account first.")
-            await ctx.message.delete()
+            await interaction.send("You have not linked your osu! account yet. Please link your account first.")
             cursor.close()
             connection.close()
             return
@@ -648,8 +498,7 @@ async def profile(ctx, *args):
         data = response.json()
 
         if not data['player']:
-            await ctx.send(f"No stats available for {username} in mode {mode_name}")
-            await ctx.message.delete()
+            await interaction.send(f"No stats available for {username} in mode {mode_name}")
             return
 
         stats_list = data['player']['stats']
@@ -660,11 +509,10 @@ async def profile(ctx, *args):
             user_id = stats.get("id")
             avatar_url = f"https://a.{domain}/{user_id}"
 
-            # You can change the Description to whatever you want, i don't really care
-            embed = discord.Embed(
+            embed = nextcord.Embed(
                 title=f"{username}'s Stats",
                 description=f"should we ban {username}?",
-                color=discord.Color.green()
+                color=nextcord.Color.green()
             )
 
             embed.set_thumbnail(url=avatar_url)
@@ -673,60 +521,21 @@ async def profile(ctx, *args):
             embed.add_field(name="accuracy", value=f"{stats.get('acc', 0):.2f}%", inline=True)
             embed.set_footer(text=f"mode: {mode_name}")
 
-            await ctx.send(embed=embed)
-            await ctx.message.delete()
-
+            await interaction.send(embed=embed)
         else:
-            await ctx.send("No stats found for this mode!")
-            await ctx.message.delete()
+            await interaction.send("No stats found for this mode!")
     
     else:
-        await ctx.send(f"I'm sorry, but the Coding Kitties couldn't find the specified user. Error: {response.status_code}")
-        await ctx.message.delete()
+        await interaction.send(f"I'm sorry, but the Coding Kitties couldn't find the specified user. Error: {response.status_code}")
 
-
-@bot.command()
-async def pprecord(ctx, mode: str = None):
-    """This gets the highest PP score for the three most played modes on osu! private servers."""
-    connection = connect_to_db()
-    if connection:
-        cursor = connection.cursor()
-
-        if mode == '-rx':
-            query = "SELECT MAX(pp) AS pprecord FROM scores WHERE grade != 'F' and status = '2' and mode = '4';"
-            mode = "Relax"
-        elif mode == '-ap':
-            query = "SELECT MAX(pp) AS pprecord FROM scores WHERE grade != 'F' AND status = '2' AND mode = '8';"
-            mode = "AutoPilot"
-        else:
-            query = "SELECT MAX(pp) AS pprecord FROM scores WHERE grade != 'F' and status = '2' and mode = '0';"
-            mode = "Vanilla"
-
-        cursor.execute(query)
-
-        result = cursor.fetchone()
-
-        if result and result['pprecord'] is not None:
-            pprecord = round(result['pprecord'], 2)
-            await ctx.send(f"## The current PP Record for {mode} is {pprecord}pp!")
-        else:
-            await ctx.send("No PP Record found. :c")
-        
-        cursor.close()
-        connection.close()
-    else:
-        await ctx.send("Could not connect to the database!")
-
-# Linking Command, lets a User link their Discord account to their Profile.
-@bot.command()
-async def link(ctx, name: str):
-    discord_id = ctx.author.id
+@bot.slash_command(guild_ids=[guildid], description=f"Links your Discord account to your {servername} Account.")
+async def link(interaction: nextcord.Interaction, name: str):
+    discord_id = interaction.user.id
     osu_username = name
 
     connection = connect_to_db()
     if not connection:
-        await ctx.send("Could not connect to the Database. Please try again later.")
-        await ctx.message.delete()
+        await interaction.send("Could not connect to the Database. Please try again later.")
         return
 
     cursor = connection.cursor()
@@ -735,8 +544,7 @@ async def link(ctx, name: str):
     result = cursor.fetchone()
 
     if result:
-        await ctx.send(f"The osu! account {osu_username} is already linked to another person.")
-        await ctx.message.delete()
+        await interaction.send(f"The osu! account {osu_username} is already linked to another person.")
         cursor.close()
         connection.close()
         return
@@ -746,8 +554,7 @@ async def link(ctx, name: str):
 
     if result:
         server_username = result['osu_username']
-        await ctx.send(f"Your Discord account is already linked to your osu! account {server_username}.")
-        await ctx.message.delete()
+        await interaction.send(f"Your Discord account is already linked to your osu! account {server_username}.")
         cursor.close()
         connection.close()
         return
@@ -770,22 +577,19 @@ async def link(ctx, name: str):
     if osu_username:
         server_username = osu_username['osu_username']
 
-        await ctx.send(f"Your Discord account has been successfully linked to {server_username}")
-        await ctx.message.delete()
+        await interaction.send(f"Your Discord account has been successfully linked to {server_username}")
         return 
 
     cursor.close()
     connection.close()
 
-# Unlink Command, lets a user unlink their Profile.
-@bot.command()
-async def unlink(ctx):
-    discord_id = ctx.author.id
+@bot.slash_command(guild_ids=[guildid], description=f"Unlinks your Discord account from your {servername} Account.")
+async def unlink(interaction: nextcord.Interaction):
+    discord_id = interaction.user.id
 
     connection = connect_to_db()
     if not connection:
-        await ctx.send("Could not connect to the Database. Please try again later.")
-        await ctx.message.delete()
+        await interaction.send("Could not connect to the Database. Please try again later.")
         return
 
     cursor = connection.cursor()
@@ -793,51 +597,64 @@ async def unlink(ctx):
     connection.commit()
     cursor.close()
     connection.close()
-    await ctx.send("Successfully unlinked your Account.")
-    await ctx.message.delete()
+    await interaction.send("Successfully unlinked your Account.")
     return
 
-# Say Command, makes the Bot say stuff.
-@bot.command()
-async def say(ctx, *, arg):
-    """This makes the bot basically say stuff you give it."""
-    """You should probably set forbidden_words up before."""
-    if arg in forbidden_words:
-      # This message is probably a bit harsh, eh
-        await ctx.send("Shut the fuck up")
-        await ctx.message.delete()
-        return
+@bot.slash_command(guild_ids=[guildid], description="Shows the PP record for the specified mode.")
+async def pprecord(interaction: nextcord.Interaction, mode: str = None):
+    connection = connect_to_db()
+    if connection:
+        cursor = connection.cursor()
+
+        if mode == 'rx':
+            query = "SELECT MAX(pp) AS pprecord FROM scores WHERE grade != 'F' and status = '2' and mode = '4';"
+            mode = "Relax"
+        elif mode == 'ap':
+            query = "SELECT MAX(pp) AS pprecord FROM scores WHERE grade != 'F' AND status = '2' AND mode = '8';"
+            mode = "AutoPilot"
+        else:
+            query = "SELECT MAX(pp) AS pprecord FROM scores WHERE grade != 'F' and status = '2' and mode = '0';"
+            mode = "Vanilla"
+
+        cursor.execute(query)
+
+        result = cursor.fetchone()
+
+        if result and result['pprecord'] is not None:
+            pprecord = round(result['pprecord'], 2)
+            await interaction.send(f"## The current PP Record for {mode} is {pprecord}pp!")
+        else:
+            await interaction.send("No PP Record found. :c")
+        
+        cursor.close()
+        connection.close()
     else:
-        await ctx.send(arg)
-        await ctx.message.delete()
-        return
+        await interaction.send("Could not connect to the database!")
 
-
-@bot.command()
-async def status(ctx):
-    """This just makes a quick GET Request to your private servers Endpoint, which is found at c.example.com"""
+@bot.slash_command(guild_ids=[guildid], description=f"Checks the Server Status for {servername}")
+async def status(interaction: nextcord.Interaction):
     url = f"https://c.{domain}"
 
     response = requests.get(url)
 
     if response.status_code == 502:
         status = "Offline"
-        embed = discord.Embed(
+        embed = nextcord.Embed(
             title=f"{servername} Server Status",
-            color=discord.Color.red()
+            color=nextcord.Color.red()
         )
 
         embed.add_field(name="server status", value=status, inline=False)
         
     else:
         status = "Online"
-        embed = discord.Embed(
+        embed = nextcord.Embed(
             title=f"{servername} Server Status",
-            color=discord.Color.green()
+            color=nextcord.Color.green()
         )
 
         embed.add_field(name="server status", value=status, inline=False)
     
-    await ctx.send(embed=embed)
+    await interaction.send(embed=embed)
 
 bot.run(bot_token)
