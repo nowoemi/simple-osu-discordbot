@@ -1,7 +1,10 @@
-discord.py
+nextcord
 requests
 mysql.connector
 pymysql
 aiohttp
 datetime
-python-dotenv
+resource
+psutil
+logging
+asyncio
