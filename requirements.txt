@@ -8,3 +8,4 @@ resource
 psutil
 logging
 asyncio
+dotenv
